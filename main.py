@@ -2,10 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, create_engine, Enum as SQLEnum
 from sqlalchemy.sql import func
 from pydantic import BaseModel
 from typing import List, Optional
+from enum import Enum
+from datetime import datetime
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -38,6 +40,13 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+# Priority Enum
+class TaskPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
 # Database Models
 class TaskDB(Base):
     __tablename__ = "tasks"
@@ -46,6 +55,7 @@ class TaskDB(Base):
     title = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
     completed = Column(Boolean, default=False)
+    priority = Column(SQLEnum(TaskPriority), default=TaskPriority.MEDIUM, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -53,6 +63,7 @@ class TaskDB(Base):
 class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
+    priority: Optional[TaskPriority] = TaskPriority.MEDIUM
 
 class TaskCreate(TaskBase):
     pass
@@ -61,12 +72,14 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     completed: Optional[bool] = None
+    priority: Optional[TaskPriority] = None
 
 class Task(TaskBase):
     id: int
     completed: bool
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    priority: TaskPriority
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -149,6 +162,39 @@ async def update_task(task_id: int, task_update: TaskUpdate, db: AsyncSession = 
         update(TaskDB)
         .where(TaskDB.id == task_id)
         .values(**update_data)
+    )
+    await db.commit()
+
+    # Refresh and return the updated task
+    await db.refresh(db_task)
+    return db_task
+
+@app.patch("/tasks/{task_id}/complete", response_model=Task)
+async def complete_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import select, update
+
+    # Get the existing task
+    result = await db.execute(select(TaskDB).where(TaskDB.id == task_id))
+    db_task = result.scalar_one_or_none()
+
+    if not db_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task with id {task_id} not found"
+        )
+
+    # Check if task is already completed
+    if db_task.completed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Task with id {task_id} is already completed"
+        )
+
+    # Mark task as completed
+    await db.execute(
+        update(TaskDB)
+        .where(TaskDB.id == task_id)
+        .values(completed=True)
     )
     await db.commit()
 
