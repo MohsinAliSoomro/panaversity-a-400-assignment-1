@@ -1,0 +1,84 @@
+# Pytest Test Template
+
+This is a basic template for creating pytest test files.
+
+## Basic Test File Template
+```python
+import pytest
+from your_module import function_to_test
+
+
+def test_function_name():
+    """Test description for what this test verifies."""
+    # Arrange
+    # Set up test data and conditions
+
+    # Act
+    # Execute the function or method being tested
+
+    # Assert
+    # Verify the expected outcome
+    pass
+
+
+if __name__ == "__main__":
+    pytest.main()
+```
+
+## Test Class Template
+```python
+import pytest
+from your_module import ClassToTest
+
+
+class TestClassToTest:
+    """Test suite for ClassToTest."""
+
+    def setup_method(self):
+        """Set up for each test method."""
+        pass
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        pass
+
+    def test_method_name(self):
+        """Test specific method functionality."""
+        # Test implementation
+        pass
+```
+
+## Fixture Template
+```python
+import pytest
+
+
+@pytest.fixture
+def sample_data():
+    """Provide sample data for tests."""
+    return {
+        'key1': 'value1',
+        'key2': 'value2'
+    }
+
+
+def test_with_fixture(sample_data):
+    """Test that uses a fixture."""
+    assert sample_data['key1'] == 'value1'
+```
+
+## Parametrized Test Template
+```python
+import pytest
+
+
+@pytest.mark.parametrize("input,expected", [
+    (1, 2),
+    (2, 4),
+    (3, 6),
+])
+def test_doubled(input, expected):
+    """Test with multiple input/expected pairs."""
+    result = input * 2
+    assert result == expected
+```
